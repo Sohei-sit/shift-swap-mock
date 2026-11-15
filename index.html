@@ -206,7 +206,7 @@ details.box li{margin:3px 0}
         <li>⭕️の期限：「締切まで」が初期値．「すぐ確定でOK」「〜日まで」も選べる．期限までに確定しなければ失効．</li>
         <li>確定（仮）：その時点の⭕️から，交代回数が少ない人を優先．同数なら固定乱数で抽選．確定時点の未回答者は，未回答のまま記録．</li>
         <li>確定後の⭕️：「もう決まっています」と表示する．</li>
-        <li>回答済みのコマは「✓ 回答済み」と回答内容を表示し，「回答を変更する」を押すまで変更できない．変更中は「変更をやめる」で戻せる．</li>
+        <li>回答済みのコマは「✓ 回答済み」と回答内容を表示し，「回答を編集」を押すまで変更できない．編集中は「編集をやめる」で戻せる．</li>
         <li>勤務日を過ぎた募集は「過去の募集（アーカイブ）」に移す（消さずに残すので，集計にも使える）．</li>
         <li>リマインド：7日前・3日前・前日（日曜なら土曜に前倒し）．対象は未回答と△の人．</li>
         <li>管理者アラート：当日募集／前日になっても未決定／対象者全員が✕．</li>
@@ -540,7 +540,9 @@ function userPanel(W,u,today){
   h+='<div class="card"><h3>📮 回答が必要な募集 <span class="pill '+(todo.length?'red':'gray')+'">'+todo.length+'件</span></h3>';
   h+=todo.length?todo.map(r=>answerRec(W,r,u,today)).join(''):'<p class="empty">回答が必要な募集はありません</p>';
   h+='</div>';
-  h+=fold('done|'+u,'✅ 回答済みの募集',done.length,done.map(r=>answerRec(W,r,u,today)).join(''),'回答済みの募集はありません');
+  h+='<div class="card"><h3>✅ 回答済みの募集 <span class="pill gray">'+done.length+'件</span></h3>';
+  h+=done.length?done.map(r=>answerRec(W,r,u,today)).join(''):'<p class="empty">回答済みの募集はありません</p>';
+  h+='</div>';
   h+=formCard(u,today);
   h+='<div class="card"><h3>📋 自分の募集（全員の回答が見える）</h3>'+(mine.length?mine.map(r=>fullRec(W,r,today,false)).join(''):'<p class="empty">受付中の募集はありません</p>')+'</div>';
   h+=fold('past|'+u,'🗄 過去の募集（アーカイブ）',past.length,past.map(r=>r.by===u?fullRec(W,r,today,false):answerRec(W,r,u,today)).join(''),'過去の募集はありません');
@@ -576,11 +578,11 @@ function userSlot(W,rec,slot,u,today){
   if(S.flash[key]) h+='<div class="flash'+(S.flash[key].ok?' ok':'')+'">'+esc(S.flash[key].text)+'</div>';
   if(a&&!need){
     h+='<div class="answered k'+a.kind+'"><div>'+ansLabel(a,rec)+'</div><div class="when">'+fmt(a.day)+'に回答</div>';
-    if(a.kind==='t'&&!rec.closed) h+='<div class="hint">調整がついたら回答を変更してください（△の間はリマインドが届きます）．</div>';
+    if(a.kind==='t'&&!rec.closed) h+='<div class="hint">調整がついたら回答を編集してください（△の間はリマインドが届きます）．</div>';
     h+='</div>';
     if(rec.closed) return h+'</div>';
-    if(!editing) return h+'<button class="secondary editbtn" data-act="edit" data-key="'+key+'">✏️ 回答を変更する</button></div>';
-    h+='<div class="editing">回答を変更しています．送信するまで，今の回答は変わりません．</div>';
+    if(!editing) return h+'<button class="secondary editbtn" data-act="edit" data-key="'+key+'">✏️ 回答を編集</button></div>';
+    h+='<div class="editing">回答を編集しています．送信するまで，今の回答は変わりません．</div>';
   }else{
     if(a) h+='<div class="mine-ans">前の回答：'+ansLabel(a,rec)+'</div>';
     else h+='<div class="mine-ans none">👀 まだ回答していません</div>';
@@ -590,7 +592,7 @@ function userSlot(W,rec,slot,u,today){
     '<button class="abtn o'+(dr.kind==='o'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="o"><span class="ic">⭕️</span>代われます</button>'+
     '<button class="abtn t'+(dr.kind==='t'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="t"><span class="ic">△</span>調整中</button>'+
     '<button class="abtn x'+(dr.kind==='x'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="x"><span class="ic">✕</span>無理</button></div>';
-  const cancel=editing?'<button class="secondary cancel" data-act="cancel" data-key="'+key+'">変更をやめる</button>':'';
+  const cancel=editing?'<button class="secondary cancel" data-act="cancel" data-key="'+key+'">編集をやめる</button>':'';
   if(!dr.kind) return h+cancel+'</div>';
   h+='<div class="detail">';
   if(dr.kind==='o'){
@@ -614,7 +616,7 @@ function userSlot(W,rec,slot,u,today){
     h+='<div class="lbl">補足（自由入力'+(dr.preset==='その他'?'・必須':'・任意')+'）</div><textarea data-key="'+key+'" data-f="reason">'+esc(dr.reason||'')+'</textarea>';
   }
   if(dr.err) h+='<div class="err">'+esc(dr.err)+'</div>';
-  h+='<button class="primary" data-act="submit" data-key="'+key+'">'+(editing?'この内容に変更する':'この内容で回答する')+'</button>'+cancel+'</div>';
+  h+='<button class="primary" data-act="submit" data-key="'+key+'">'+(editing?'この内容で更新する':'この内容で回答する')+'</button>'+cancel+'</div>';
   return h+'</div>';
 }
 function chip(key,f,v,label,cur){return '<button class="chip'+(cur===v?' on':'')+'" data-act="pick" data-key="'+key+'" data-f="'+f+'" data-v="'+esc(v)+'">'+esc(label)+'</button>';}
@@ -712,7 +714,7 @@ document.addEventListener('click',e=>{
     const W0=simulate(S.today),sl=W0.recs[rid].slotState[slot];
     addAction(a);
     S.drafts[key]={};const wasEdit=!!S.edit[key];delete S.edit[key];
-    S.flash[key]=(d.kind==='o'&&sl.confirmed)?{text:'このコマは，もう決まっています．回答ありがとうございました．'}:{text:wasEdit?'回答を変更しました．':'回答を送信しました．',ok:true};
+    S.flash[key]=(d.kind==='o'&&sl.confirmed)?{text:'このコマは，もう決まっています．回答ありがとうございました．'}:{text:wasEdit?'回答を更新しました．':'回答を送信しました．',ok:true};
     render();return;
   }
 });
