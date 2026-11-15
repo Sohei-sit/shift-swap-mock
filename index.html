@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>シフト交代募集システム（モック）</title>
+<style>
+:root{
+  --bg:#f3f4f7;--card:#fff;--ink:#1c2230;--sub:#606a7c;--line:#e1e4ea;
+  --acc:#2f6fdf;--accbg:#eaf1fd;--o:#1b8a4b;--obg:#e6f5ec;--t:#a86f00;--tbg:#fff4dc;
+  --x:#c93c3c;--xbg:#fdeaea;--gray:#8a93a3;--graybg:#eef0f3;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:system-ui,-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55}
+button{font:inherit;color:inherit;cursor:pointer}
+select,input,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:8px 12px 6px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.hrow{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.title{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dummy{display:inline-block;margin-left:6px;font-size:11px;font-weight:600;color:var(--t);background:var(--tbg);border-radius:4px;padding:0 5px;vertical-align:1px}
+.daybox{display:flex;align-items:center;gap:6px}
+.daybox button{width:36px;height:36px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:14px}
+.daybox button:disabled{opacity:.35}
+.today{text-align:center;min-width:92px;line-height:1.15}
+.today b{font-size:17px}
+.today small{display:block;font-size:11px;color:var(--sub)}
+input[type=range]{width:100%;margin:6px 0 2px;accent-color:var(--acc)}
+.ticks{display:grid;grid-template-columns:repeat(15,1fr);gap:1px;font-size:10px;color:var(--sub);text-align:center;user-select:none}
+.tick{padding:1px 0 2px;border-radius:4px;cursor:pointer;line-height:1.2}
+.tick.cur{background:var(--accbg);color:var(--acc);font-weight:700}
+.tick.sun{color:var(--x)}
+.tick.sat{color:var(--acc)}
+.dots{height:7px;display:flex;justify-content:center;gap:1px;margin-top:1px}
+.dot{width:5px;height:5px;border-radius:50%}
+.d-remind{background:var(--t)}.d-confirm{background:var(--o)}.d-alert{background:var(--x)}.d-expire{background:var(--gray)}.d-create{background:var(--acc)}
+.events{font-size:12px;color:var(--sub);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.events b{color:var(--ink)}
+.legend{font-size:11px;color:var(--sub);display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.legend span{display:inline-flex;align-items:center;gap:3px}
+nav#tabs{position:sticky;z-index:15;display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-bottom:1px solid var(--line)}
+nav#tabs button{border:0;background:none;padding:9px 2px 8px;font-size:13px;font-weight:600;color:var(--sub);border-bottom:3px solid transparent;position:relative}
+nav#tabs button.on{color:var(--acc);border-bottom-color:var(--acc)}
+.badge{display:inline-block;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--x);color:#fff;font-size:11px;line-height:17px;margin-left:3px;vertical-align:1px}
+main{padding:10px;max-width:640px;margin:0 auto}
+.panel{display:none}
+.panel.on{display:block}
+.who{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:2px 2px 8px}
+.who h2{font-size:17px;margin:0}
+.who .name{font-size:13px;color:var(--sub)}
+.scope{font-size:12px;color:var(--sub);background:var(--graybg);border-radius:6px;padding:4px 8px;margin:0 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.card>h3{font-size:14px;margin:0 0 8px;display:flex;align-items:center;gap:6px}
+.empty{color:var(--sub);font-size:13px;margin:4px 0}
+.inbox{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto}
+.inbox li{font-size:13px;padding:6px 8px;border-radius:8px;margin-bottom:4px;background:#f8f9fb;border-left:3px solid var(--line)}
+.inbox li.new{background:var(--accbg);border-left-color:var(--acc)}
+.inbox li.k-alert{border-left-color:var(--x);background:var(--xbg)}
+.inbox li.k-remind{border-left-color:var(--t)}
+.inbox li.k-confirm{border-left-color:var(--o)}
+.inbox li .d{font-size:11px;color:var(--sub);margin-right:4px}
+.inbox li .nw{font-size:10px;font-weight:700;color:#fff;background:var(--acc);border-radius:3px;padding:0 4px;margin-right:4px}
+.rec{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px}
+.rechead{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.rechead b{font-size:15px}
+.meta{font-size:12px;color:var(--sub);margin-top:2px}
+.note{font-size:13px;margin-top:4px;padding:4px 8px;background:#f8f9fb;border-radius:6px}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:1px 8px;white-space:nowrap}
+.pill.blue{background:var(--accbg);color:var(--acc)}
+.pill.green{background:var(--obg);color:var(--o)}
+.pill.yellow{background:var(--tbg);color:var(--t)}
+.pill.red{background:var(--xbg);color:var(--x)}
+.pill.gray{background:var(--graybg);color:var(--gray)}
+.slot{border-top:1px dashed var(--line);margin-top:10px;padding-top:8px}
+.slothead{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;flex-wrap:wrap}
+.slot.mine{background:var(--obg);border:1px solid #bfe3cc;border-radius:8px;padding:8px}
+.conf{font-size:13px;margin:4px 0;padding:5px 8px;border-radius:6px;background:var(--obg)}
+.ans-row{display:grid;grid-template-columns:5.5em 1fr;gap:6px;font-size:13px;padding:4px 0;border-bottom:1px solid #f0f1f4}
+.ans-row:last-child{border-bottom:0}
+.ans-row .n{color:var(--sub);font-size:12px;padding-top:1px}
+.ans-row .when{font-size:11px;color:var(--sub)}
+.k-o{color:var(--o)}.k-t{color:var(--t)}.k-x{color:var(--x)}.k-n{color:var(--gray)}
+.mine-ans{font-size:13px;margin:4px 0 6px}
+.mine-ans.none{color:var(--sub)}
+.btns{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.abtn{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:8px 2px;font-size:13px;font-weight:600;line-height:1.2}
+.abtn .ic{display:block;font-size:18px;margin-bottom:1px}
+.abtn.o.on{border-color:var(--o);background:var(--obg);color:var(--o)}
+.abtn.t.on{border-color:var(--t);background:var(--tbg);color:var(--t)}
+.abtn.x.on{border-color:var(--x);background:var(--xbg);color:var(--x)}
+.detail{margin-top:8px;padding:8px;border-radius:8px;background:#f8f9fb}
+.lbl{font-size:12px;font-weight:700;margin:6px 0 4px;color:var(--sub)}
+.lbl:first-child{margin-top:0}
+.req{color:var(--x);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 10px;font-size:12.5px}
+.chip.on{border-color:var(--acc);background:var(--accbg);color:var(--acc);font-weight:700}
+.chip.slotc{min-width:48px}
+.hint{font-size:12px;color:var(--sub);margin-top:5px}
+.err{font-size:12px;color:var(--x);font-weight:700;margin-top:5px}
+.flash{font-size:13px;font-weight:700;margin:6px 0;padding:6px 8px;border-radius:6px;background:var(--tbg);color:var(--t)}
+.flash.ok{background:var(--obg);color:var(--o)}
+textarea,input[type=text],select{width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:#fff;font-size:14px}
+textarea{min-height:52px;resize:vertical}
+select.inline{width:auto;padding:4px 6px;font-size:13px}
+.primary{display:block;width:100%;margin-top:8px;border:0;border-radius:10px;padding:10px;background:var(--acc);color:#fff;font-weight:700}
+.secondary{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-size:13px}
+.field{margin-bottom:8px}
+.stat{margin-bottom:10px}
+.stat .top{display:flex;justify-content:space-between;font-size:13px}
+.bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--graybg);margin:4px 0 2px}
+.bar span{display:block;height:100%}
+.bar .bo{background:var(--o)}.bar .bt{background:#e0a422}.bar .bx{background:var(--x)}.bar .bn{background:#b9c0cc}
+.stat .txt{font-size:11.5px;color:var(--sub)}
+.foot{max-width:640px;margin:0 auto;padding:0 10px 40px}
+details.box{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:13px}
+details.box summary{font-weight:700;cursor:pointer}
+details.box ul{padding-left:1.2em;margin:6px 0}
+details.box li{margin:3px 0}
+.loglist{list-style:none;padding:0;margin:6px 0}
+.loglist li{padding:3px 0;border-bottom:1px solid #f0f1f4}
+.loglist .d{color:var(--sub);font-size:11px;margin-right:4px}
+.loglist .vis{font-size:10.5px;color:var(--gray);margin-left:4px}
+.loglist li.cur{background:var(--accbg)}
+.settings{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.rulebox{font-size:12px}
+.rulebox label{display:flex;gap:6px;align-items:flex-start;margin:4px 0}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222a;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50;max-width:90vw;text-align:center;background:rgba(30,34,44,.92)}
+#toast.show{opacity:1}
+@media (min-width:1100px){
+  nav#tabs{display:none}
+  main{max-width:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:12px}
+  .panel{display:block}
+  .foot{max-width:none;padding:0 12px 40px;display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+  header .inner{max-width:900px;margin:0 auto}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <div class="hrow">
+      <div class="title">シフト交代募集（モック）<span class="dummy">ダミーデータ</span></div>
+      <div class="daybox">
+        <button data-act="prev" aria-label="前の日">◀</button>
+        <div class="today" id="todayLabel"></div>
+        <button data-act="next" aria-label="次の日">▶</button>
+      </div>
+    </div>
+    <input type="range" id="slider" min="0" max="14" step="1" value="0" aria-label="今日の日付">
+    <div class="ticks" id="ticks"></div>
+    <div class="events" id="events"></div>
+  </div>
+</header>
+
+<nav id="tabs">
+  <button data-act="tab" data-tab="rec">募集者<span class="bd" data-bd="rec"></span></button>
+  <button data-act="tab" data-tab="adm">管理者<span class="bd" data-bd="adm"></span></button>
+  <button data-act="tab" data-tab="ua">利用者A<span class="bd" data-bd="ua"></span></button>
+  <button data-act="tab" data-tab="ub">利用者B<span class="bd" data-bd="ub"></span></button>
+</nav>
+
+<main>
+  <section class="panel" id="p-rec"></section>
+  <section class="panel" id="p-adm"></section>
+  <section class="panel" id="p-ua"></section>
+  <section class="panel" id="p-ub"></section>
+</main>
+
+<div class="foot">
+  <div>
+    <details class="box" open>
+      <summary>設定・シナリオ</summary>
+      <div class="rulebox">
+        <div class="lbl">確定のタイミング（仮ルール）</div>
+        <label><input type="radio" name="rule" value="earliest"> <span><b>A：締切と⭕️の期限のうち最も早い時点</b>（文書の仮ルール．このルールでは，確定が必ず期限以前に起きるため，⭕️は失効しません）</span></label>
+        <label><input type="radio" name="rule" value="deadline"> <span><b>B：締切の時点だけ</b>（比較用．⭕️の期限が締切より前なら，期限を過ぎた⭕️は失効します）</span></label>
+      </div>
+      <div class="settings">
+        <button class="secondary" data-act="reset">最初のシナリオに戻す</button>
+        <button class="secondary" data-act="clear">空のデータから始める</button>
+      </div>
+      <div class="hint">最初のシナリオ：0日目に募集者が7日後の3限・4限を募集．管理者が締切を5日目に設定．利用者Aが⭕️（3日目まで待てる），利用者Bが△（誰もいなければ入ります）．日付を進めて動きを確認してください．</div>
+    </details>
+    <details class="box">
+      <summary>このモックのルール</summary>
+      <ul>
+        <li>募集：日付と7コマ（1限・2限・昼・3限・4限・5限・6限）を選ぶ．コマごとに独立して確定する．</li>
+        <li>締切：管理者が設定する．未設定の間は，モックの初期値として「勤務の前日」（当日募集は当日）を使う．</li>
+        <li>回答：⭕️代われます／△調整中（理由必須）／✕無理（範囲と理由が必須）．回答は何度でも変更できる．</li>
+        <li>見え方：利用者には自分の回答だけ．募集者と管理者には全員の回答．確定は外部に公開しない．</li>
+        <li>⭕️の期限：「締切まで」が初期値．「すぐ確定でOK」「〜日まで」も選べる．期限までに確定しなければ失効．</li>
+        <li>確定（仮）：その時点の⭕️から，交代回数が少ない人を優先．同数なら固定乱数で抽選．確定時点の未回答者は，未回答のまま記録．</li>
+        <li>確定後の⭕️：「もう決まっています」と表示する．</li>
+        <li>リマインド：7日前・3日前・前日（日曜なら土曜に前倒し）．対象は未回答と△の人．</li>
+        <li>管理者アラート：当日募集／前日になっても未決定／対象者全員が✕．</li>
+        <li>処理の順番（モックの仮定）：毎日，朝に確定・失効の判定，日中に操作，夕方にリマインドと前日アラート．</li>
+        <li>モックの仮定：締切後も⭕️は受け付け，⭕️が来たらその場で確定．確定したコマへのリマインドは止める．失効した⭕️はリマインド対象に戻す．選ばれなかった⭕️の人には「他の人で決まった」と通知する．</li>
+      </ul>
+    </details>
+  </div>
+  <details class="box" id="logbox">
+    <summary>全体ログ（デモ用．実際は誰にも見えない情報を含む）</summary>
+    <ul class="loglist" id="loglist"></ul>
+  </details>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- 定数（すべてダミー） ---------- */
+const BASE = new Date(2026, 10, 16); // 0日目
+const MAXDAY = 14;
+const SLOTS = ['1限','2限','昼','3限','4限','5限','6限'];
+const WK = '日月火水木金土';
+const PEOPLE = {
+  rec: {name:'青山 ユイ', short:'青山', role:'募集者'},
+  adm: {name:'森本（職員）', short:'森本', role:'管理者'},
+  ua:  {name:'川口 ソウタ', short:'川口', role:'利用者A'},
+  ub:  {name:'野村 リコ',   short:'野村', role:'利用者B'}
+};
+const TARGETS = ['ua','ub'];
+// 過去の記録（ダミー）
+const HISTORY = {
+  ua: {swaps:4, o:6, t:2, x:4, n:2},
+  ub: {swaps:1, o:1, t:6, x:3, n:5}
+};
+const T_PRESETS = ['誰もいなければ入ります','予定を確認中です','授業・課題の都合を調整中です','その他'];
+const X_PRESETS = ['授業・試験と重なる','学外の予定（就活など）','体調がすぐれない','その他'];
+
+/* ---------- 状態 ---------- */
+const S = {today:0, rule:'earliest', actions:[], seq:0, tab:'rec', drafts:{}, flash:{}, form:null};
+
+/* ---------- 補助 ---------- */
+function dateOf(d){const x=new Date(BASE);x.setDate(x.getDate()+d);return x;}
+function fmt(d){const x=dateOf(d);return (x.getMonth()+1)+'/'+x.getDate()+'('+WK[x.getDay()]+')';}
+function wday(d){return dateOf(d).getDay();}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function nm(u){return PEOPLE[u].short+'さん';}
+function $(id){return document.getElementById(id);}
+
+function addRaw(a){a.seq=++S.seq;S.actions.push(a);}
+
+function scenario(){
+  S.actions=[];S.seq=0;S.drafts={};S.flash={};
+  addRaw({day:0,type:'create',by:'rec',rid:'R1',shiftDay:7,slots:['3限','4限'],note:'ゼミ合宿のため（ダミー）'});
+  addRaw({day:0,type:'deadline',rid:'R1',deadline:5});
+  ['3限','4限'].forEach(s=>addRaw({day:0,type:'answer',rid:'R1',slot:s,user:'ua',kind:'o',expiry:3}));
+  ['3限','4限'].forEach(s=>addRaw({day:0,type:'answer',rid:'R1',slot:s,user:'ub',kind:'t',preset:T_PRESETS[0],reason:''}));
+}
+
+/* ---------- シミュレーション ---------- */
+function expDay(rec,a){return a.expiry==='deadline'?rec.deadline:(a.expiry==='now'?a.day:a.expiry);}
+function expText(rec,a){
+  if(a.expiry==='deadline') return '締切（'+fmt(rec.deadline)+'）まで待てる';
+  if(a.expiry==='now') return 'すぐ確定でOK（'+fmt(a.day)+'）';
+  return fmt(a.expiry)+'まで待てる';
+}
+function reminderDays(rec){
+  return [7,3,1].map(k=>{
+    let day=rec.shiftDay-k, shifted=false;
+    if(wday(day)===0){day--;shifted=true;}
+    return {day, label:(k===1?'前日':k+'日前')+(shifted?'（日曜のため土曜に前倒し）':'')};
+  });
+}
+
+function simulate(today){
+  const W={recs:{},order:[],inbox:{rec:[],adm:[],ua:[],ub:[]},log:[],swaps:{},rule:S.rule};
+  TARGETS.forEach(u=>W.swaps[u]=HISTORY[u].swaps);
+  const acts=S.actions.filter(a=>a.day<=today).sort((a,b)=>a.day-b.day||a.seq-b.seq);
+  let i=0;
+  for(let d=0;d<=today;d++){
+    check(W,d);                       // 朝：確定・失効
+    while(i<acts.length&&acts[i].day===d){apply(W,acts[i],d);check(W,d);i++;} // 日中：操作
+    evening(W,d);                     // 夕方：リマインド・前日アラート
+  }
+  return W;
+}
+function log(W,d,kind,text,vis){W.log.push({d,kind,text,vis:vis||''});}
+function notify(W,who,d,kind,text){W.inbox[who].push({d,kind,text});}
+function alertAdm(W,d,text){notify(W,'adm',d,'alert','【アラート】'+text);log(W,d,'alert','管理者アラート：'+text,'管理者');}
+
+function apply(W,a,d){
+  if(a.type==='create'){
+    const rec={id:a.rid,by:a.by,shiftDay:a.shiftDay,slots:a.slots.slice(),note:a.note||'',created:d,
+      deadline:Math.max(d,a.shiftDay-1),deadlineSet:false,closed:false,slotState:{}};
+    rec.slots.forEach(s=>rec.slotState[s]={ans:{},confirmed:null,noAnswer:null,allX:false,dlNoted:false});
+    W.recs[rec.id]=rec;W.order.push(rec.id);
+    const t=fmt(rec.shiftDay)+' '+rec.slots.join('・');
+    log(W,d,'create','募集が出ました：'+t,'全員');
+    TARGETS.forEach(u=>notify(W,u,d,'info','【新しい募集】'+t+'の交代を募集しています．'));
+    notify(W,'rec',d,'info','募集を出しました：'+t);
+    notify(W,'adm',d,'info','新しい募集：'+t+'（募集者：'+nm(rec.by)+'）．締切を設定してください．');
+    if(rec.shiftDay===d) alertAdm(W,d,'当日の募集が出ました：'+t);
+    return;
+  }
+  const rec=W.recs[a.rid]; if(!rec) return;
+  if(a.type==='deadline'){
+    rec.deadline=a.deadline;rec.deadlineSet=true;
+    log(W,d,'info',fmt(rec.shiftDay)+'の募集の締切を'+fmt(a.deadline)+'に設定','管理者・募集者');
+    notify(W,'rec',d,'info','管理者が締切を'+fmt(a.deadline)+'に設定しました．');
+    return;
+  }
+  if(a.type==='answer'){
+    if(rec.closed) return;
+    const sl=rec.slotState[a.slot];
+    if(sl.confirmed&&sl.confirmed.user===a.user) return;
+    const ans=Object.assign({},a,{day:d,expired:false,late:false,afterConfirm:!!sl.confirmed});
+    const label=fmt(rec.shiftDay)+' '+a.slot;
+    if(a.kind==='o'&&sl.confirmed){
+      ans.late=true;
+      notify(W,a.user,d,'info','【お知らせ】'+label+'は，もう決まっています．回答ありがとうございました．');
+      log(W,d,'answer',nm(a.user)+'が'+a.slot+'に⭕️ → 確定済みのため「もう決まっています」と表示','本人');
+    }else{
+      log(W,d,'answer',nm(a.user)+'が'+a.slot+'に'+ansLabel(ans,rec,true)+(sl.confirmed?'（確定後）':''),'本人・募集者・管理者');
+    }
+    sl.ans[a.user]=ans;
+    if(!sl.confirmed&&!sl.allX&&TARGETS.every(u=>sl.ans[u]&&sl.ans[u].kind==='x')){
+      sl.allX=true; alertAdm(W,d,'対象者全員が✕：'+label);
+    }
+  }
+}
+
+function check(W,d){
+  W.order.forEach(id=>{
+    const rec=W.recs[id]; if(rec.closed) return;
+    if(d>rec.shiftDay){
+      rec.closed=true;
+      const un=rec.slots.filter(s=>!rec.slotState[s].confirmed);
+      log(W,d,'info',fmt(rec.shiftDay)+'の募集を終了'+(un.length?'（不成立：'+un.join('・')+'）':''),'募集者・管理者');
+      return;
+    }
+    rec.slots.forEach(slot=>{
+      const sl=rec.slotState[slot]; if(sl.confirmed) return;
+      // 失効
+      TARGETS.forEach(u=>{
+        const a=sl.ans[u];
+        if(a&&a.kind==='o'&&!a.late&&!a.expired&&expDay(rec,a)<d){
+          a.expired=true;
+          notify(W,u,d,'expire','【失効】'+fmt(rec.shiftDay)+' '+slot+'の⭕️は，期限（'+fmt(expDay(rec,a))+'）までに確定しなかったため失効しました．');
+          log(W,d,'expire',nm(u)+'の'+slot+'の⭕️が失効（期限 '+fmt(expDay(rec,a))+'）','本人・募集者・管理者');
+        }
+      });
+      const active=TARGETS.filter(u=>{const a=sl.ans[u];return a&&a.kind==='o'&&!a.late&&!a.expired;});
+      let trig=rec.deadline;
+      if(W.rule==='earliest') active.forEach(u=>{trig=Math.min(trig,expDay(rec,sl.ans[u]));});
+      if(active.length&&d>=trig){confirm(W,rec,slot,active,d,trig);}
+      else if(!active.length&&d>=rec.deadline&&!sl.dlNoted){
+        sl.dlNoted=true;
+        log(W,d,'info','締切を過ぎたが'+slot+'は未決定（⭕️なし）','募集者・管理者');
+      }
+    });
+  });
+}
+
+function confirm(W,rec,slot,active,d,trig){
+  const sl=rec.slotState[slot];
+  const min=Math.min.apply(null,active.map(u=>W.swaps[u]));
+  const cands=active.filter(u=>W.swaps[u]===min);
+  let chosen,method;
+  if(cands.length===1){chosen=cands[0];method=active.length>1?'交代回数が少ない人を優先':'⭕️は1人';}
+  else{chosen=cands.slice().sort((a,b)=>hash(rec.id+slot+a)-hash(rec.id+slot+b))[0];method='交代回数が同じため抽選（固定乱数）';}
+  const why = trig===rec.deadline&&d>=rec.deadline?'締切':'⭕️の期限';
+  sl.confirmed={user:chosen,day:d,method,why};
+  sl.noAnswer=TARGETS.filter(u=>!sl.ans[u]);
+  W.swaps[chosen]++;
+  const label=fmt(rec.shiftDay)+' '+slot;
+  notify(W,chosen,d,'confirm','【確定】'+label+'の交代は，あなたに決まりました．');
+  active.filter(u=>u!==chosen).forEach(u=>notify(W,u,d,'info','【お知らせ】'+label+'は他の人で決まりました．あなたの⭕️は使われませんでした．'));
+  const na=sl.noAnswer.length?sl.noAnswer.map(nm).join('，'):'なし';
+  const msg='【確定】'+label+'：'+nm(chosen)+'（'+method+'，'+why+'による確定）．確定時点の未回答：'+na;
+  notify(W,'rec',d,'confirm',msg);notify(W,'adm',d,'confirm',msg);
+  log(W,d,'confirm',label+'を'+nm(chosen)+'に確定（'+method+'，'+why+'）','本人・募集者・管理者');
+}
+
+function evening(W,d){
+  W.order.forEach(id=>{
+    const rec=W.recs[id]; if(rec.closed||d>=rec.shiftDay) return;
+    const unconf=rec.slots.filter(s=>!rec.slotState[s].confirmed);
+    reminderDays(rec).forEach(r=>{
+      if(r.day!==d||r.day<rec.created) return;
+      if(!unconf.length){log(W,d,'info',r.label+'リマインド：全コマ確定済みのため送信なし','');return;}
+      const sent=[];
+      TARGETS.forEach(u=>{
+        const parts=[];
+        unconf.forEach(s=>{
+          const a=rec.slotState[s].ans[u];
+          if(!a) parts.push(s+'：未回答');
+          else if(a.kind==='t') parts.push(s+'：調整中');
+          else if(a.kind==='o'&&a.expired) parts.push(s+'：⭕️失効');
+        });
+        if(parts.length){
+          sent.push(nm(u));
+          notify(W,u,d,'remind','【リマインド・'+r.label+'】'+fmt(rec.shiftDay)+'の募集に回答をお願いします（'+parts.join('，')+'）．');
+        }
+      });
+      log(W,d,'remind',r.label+'リマインド → '+(sent.length?sent.join('，'):'対象者なし'),'対象者本人');
+    });
+    if(d===rec.shiftDay-1&&unconf.length) alertAdm(W,d,'前日になっても未決定：'+fmt(rec.shiftDay)+' '+unconf.join('・'));
+  });
+}
+
+/* ---------- 表示用 ---------- */
+function ansLabel(a,rec,plain){
+  let s='';
+  if(a.kind==='o'){
+    s='⭕️ 代われます';
+    if(a.late) s+='（確定後の⭕️：もう決まっています）';
+    else if(a.expired) s+='（失効．期限 '+fmt(expDay(rec,a))+'）';
+    else s+='（'+expText(rec,a)+'）';
+  }else if(a.kind==='t'){
+    s='△ 調整中：'+a.preset+(a.reason?'／'+a.reason:'');
+  }else{
+    s='✕ 無理（'+(a.range==='all'?'全体':'一部：'+a.rangeNote)+'）：'+a.preset+(a.reason?'／'+a.reason:'');
+  }
+  if(plain) return s;
+  const cls=a.kind==='o'?(a.expired||a.late?'k-n':'k-o'):(a.kind==='t'?'k-t':'k-x');
+  return '<span class="'+cls+'">'+esc(s)+'</span>';
+}
+function inboxHTML(list,today){
+  if(!list.length) return '<p class="empty">通知はありません</p>';
+  return '<ul class="inbox">'+list.slice().reverse().map(n=>
+    '<li class="k-'+n.kind+(n.d===today?' new':'')+'">'+(n.d===today?'<span class="nw">今日</span>':'')+'<span class="d">'+fmt(n.d)+'</span>'+esc(n.text)+'</li>').join('')+'</ul>';
+}
+function slotStatus(rec,slot,today){
+  const sl=rec.slotState[slot];
+  if(sl.confirmed) return '<span class="pill green">確定</span>';
+  if(rec.closed) return '<span class="pill gray">不成立</span>';
+  if(today>=rec.deadline) return '<span class="pill red">締切後・未決定</span>';
+  return '<span class="pill blue">募集中</span>';
+}
+function recStatus(rec){
+  const n=rec.slots.filter(s=>rec.slotState[s].confirmed).length;
+  if(n===rec.slots.length) return '<span class="pill green">全コマ確定</span>';
+  if(rec.closed) return '<span class="pill gray">終了</span>';
+  if(n>0) return '<span class="pill yellow">一部確定</span>';
+  return '<span class="pill blue">募集中</span>';
+}
+
+function fullRec(W,rec,today,isAdm){
+  let h='<div class="rec"><div class="rechead"><b>'+fmt(rec.shiftDay)+' '+rec.slots.join('・')+'</b>'+recStatus(rec)+'</div>';
+  h+='<div class="meta">募集者：'+esc(PEOPLE[rec.by].name)+' ／ 募集日：'+fmt(rec.created)+'</div>';
+  if(isAdm&&!rec.closed){
+    let opts='';
+    for(let d=rec.created;d<=rec.shiftDay;d++) opts+='<option value="'+d+'"'+(d===rec.deadline?' selected':'')+'>'+fmt(d)+'</option>';
+    h+='<div class="meta">締切：<select class="inline" data-deadline="'+rec.id+'">'+opts+'</select>'+(rec.deadlineSet?'':'（初期値・未設定）')+'</div>';
+  }else{
+    h+='<div class="meta">締切：'+fmt(rec.deadline)+(rec.deadlineSet?'':'（初期値．管理者が未設定）')+'</div>';
+  }
+  if(rec.note) h+='<div class="note">'+esc(rec.note)+'</div>';
+  rec.slots.forEach(slot=>{
+    const sl=rec.slotState[slot];
+    h+='<div class="slot"><div class="slothead">'+slot+' '+slotStatus(rec,slot,today)+'</div>';
+    if(sl.confirmed) h+='<div class="conf">確定：<b>'+esc(PEOPLE[sl.confirmed.user].name)+'</b>（'+fmt(sl.confirmed.day)+'，'+sl.confirmed.method+'）</div>';
+    TARGETS.forEach(u=>{
+      const a=sl.ans[u];
+      h+='<div class="ans-row"><div class="n">'+esc(PEOPLE[u].short)+'<br>'+PEOPLE[u].role+'</div><div>';
+      if(a) h+=ansLabel(a,rec)+'<div class="when">'+fmt(a.day)+'に回答'+(a.afterConfirm?'（確定後）':'')+'</div>';
+      else h+='<span class="k-n">👀 未回答</span>'+(sl.noAnswer&&sl.noAnswer.indexOf(u)>=0?'<div class="when">確定時点で未回答として記録</div>':'');
+      h+='</div></div>';
+    });
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+
+function recruiterPanel(W,today){
+  const f=S.form||(S.form={day:Math.min(today+7,MAXDAY),slots:[],note:''});
+  if(f.day<today) f.day=today;
+  let opts='';
+  for(let d=today;d<=MAXDAY;d++) opts+='<option value="'+d+'"'+(d===f.day?' selected':'')+'>'+fmt(d)+(d===today?'（今日）':'')+'</option>';
+  let h=head('rec','自分が出した募集について，全員の回答が見えます．');
+  h+='<div class="card"><h3>🔔 通知</h3>'+inboxHTML(W.inbox.rec,today)+'</div>';
+  h+='<div class="card"><h3>＋ 新しく募集する</h3>';
+  h+='<div class="field"><div class="lbl">日付 <span class="req">必須</span></div><select data-form="day">'+opts+'</select></div>';
+  h+='<div class="field"><div class="lbl">コマ（複数可．コマごとに管理） <span class="req">必須</span></div><div class="chips">'+
+    SLOTS.map(s=>'<button class="chip slotc'+(f.slots.indexOf(s)>=0?' on':'')+'" data-act="fslot" data-slot="'+s+'">'+s+'</button>').join('')+'</div></div>';
+  h+='<div class="field"><div class="lbl">備考（任意）</div><input type="text" data-form="note" value="'+esc(f.note)+'" placeholder="例：家の用事のため（ダミー）"></div>';
+  if(f.day===today) h+='<div class="hint">⚠️ 当日の募集です．管理者にアラートが届きます．</div>';
+  h+='<div class="hint">締切は管理者が設定します（未設定の間は前日扱い）．</div>';
+  if(S.flash.form) h+='<div class="err">'+esc(S.flash.form)+'</div>';
+  h+='<button class="primary" data-act="create">募集を出す</button></div>';
+  const mine=W.order.map(id=>W.recs[id]).filter(r=>r.by==='rec').reverse();
+  h+='<div class="card"><h3>📋 自分の募集</h3>'+(mine.length?mine.map(r=>fullRec(W,r,today,false)).join(''):'<p class="empty">まだ募集していません</p>')+'</div>';
+  return h;
+}
+
+function adminPanel(W,today){
+  let h=head('adm','全募集の全員の回答，交代回数と回答傾向の集計が見えます．リマインドの対象外です．');
+  const al=W.inbox.adm.filter(n=>n.kind==='alert');
+  h+='<div class="card"><h3>🚨 アラート <span class="pill '+(al.length?'red':'gray')+'">'+al.length+'件</span></h3>'+
+     (al.length?inboxHTML(al,today):'<p class="empty">アラートはありません</p>')+'</div>';
+  h+='<div class="card"><h3>📋 募集一覧（締切を設定）</h3>'+(W.order.length?W.order.slice().reverse().map(id=>fullRec(W,W.recs[id],today,true)).join(''):'<p class="empty">募集はありません</p>')+'</div>';
+  h+='<div class="card"><h3>📊 交代回数と回答傾向</h3>';
+  TARGETS.forEach(u=>{
+    const c={o:HISTORY[u].o,t:HISTORY[u].t,x:HISTORY[u].x,n:HISTORY[u].n};
+    W.order.forEach(id=>{const rec=W.recs[id];rec.slots.forEach(s=>{
+      const sl=rec.slotState[s],a=sl.ans[u];
+      if(a) c[a.kind]++;
+      else if(sl.confirmed||rec.closed||today>=rec.deadline) c.n++;
+    });});
+    const tot=c.o+c.t+c.x+c.n||1, p=k=>Math.round(c[k]/tot*100);
+    h+='<div class="stat"><div class="top"><b>'+esc(PEOPLE[u].name)+'</b><span>交代 <b>'+W.swaps[u]+'</b>回</span></div>'+
+      '<div class="bar"><span class="bo" style="width:'+p('o')+'%"></span><span class="bt" style="width:'+p('t')+'%"></span><span class="bx" style="width:'+p('x')+'%"></span><span class="bn" style="width:'+p('n')+'%"></span></div>'+
+      '<div class="txt">⭕️ '+p('o')+'%・△ '+p('t')+'%・✕ '+p('x')+'%・無反応 '+p('n')+'%（'+(c.o+c.t+c.x+c.n)+'件）</div></div>';
+  });
+  h+='<div class="hint">過去の記録（ダミー）に，このモック内の回答を足した値．無反応は，確定・締切・終了の時点で未回答だったコマ．</div></div>';
+  h+='<div class="card"><h3>🔔 通知</h3>'+inboxHTML(W.inbox.adm.filter(n=>n.kind!=='alert'),today)+'</div>';
+  return h;
+}
+
+function userPanel(W,u,today){
+  let h=head(u,'自分の回答だけが見えます．他の人の回答や，確定したかどうかは見えません．');
+  h+='<div class="card"><h3>🔔 通知</h3>'+inboxHTML(W.inbox[u],today)+'</div>';
+  const recs=W.order.map(id=>W.recs[id]).reverse();
+  h+='<div class="card"><h3>📮 交代の募集</h3>';
+  if(!recs.length) h+='<p class="empty">募集はまだありません</p>';
+  recs.forEach(rec=>{
+    h+='<div class="rec"><div class="rechead"><b>'+fmt(rec.shiftDay)+' '+rec.slots.join('・')+'</b>'+(rec.closed?'<span class="pill gray">終了</span>':'<span class="pill blue">受付中</span>')+'</div>';
+    h+='<div class="meta">募集者：'+esc(PEOPLE[rec.by].name)+' ／ 締切：'+fmt(rec.deadline)+(today>=rec.deadline&&!rec.closed?'（締切後も回答できます）':'')+'</div>';
+    if(rec.note) h+='<div class="note">'+esc(rec.note)+'</div>';
+    rec.slots.forEach(slot=>{h+=userSlot(W,rec,slot,u,today);});
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+
+function userSlot(W,rec,slot,u,today){
+  const sl=rec.slotState[slot],a=sl.ans[u],key=u+'|'+rec.id+'|'+slot;
+  const dr=S.drafts[key]||{};
+  if(sl.confirmed&&sl.confirmed.user===u)
+    return '<div class="slot mine"><div class="slothead">'+slot+' <span class="pill green">あなたに確定</span></div><div class="hint">'+fmt(sl.confirmed.day)+'に確定しました．当日はよろしくお願いします．</div></div>';
+  let h='<div class="slot"><div class="slothead">'+slot+'</div>';
+  h+=a?'<div class="mine-ans">あなたの回答：'+ansLabel(a,rec)+'</div>':'<div class="mine-ans none">👀 まだ回答していません</div>';
+  if(S.flash[key]) h+='<div class="flash'+(S.flash[key].ok?' ok':'')+'">'+esc(S.flash[key].text)+'</div>';
+  if(rec.closed) return h+'</div>';
+  h+='<div class="btns">'+
+    '<button class="abtn o'+(dr.kind==='o'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="o"><span class="ic">⭕️</span>代われます</button>'+
+    '<button class="abtn t'+(dr.kind==='t'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="t"><span class="ic">△</span>調整中</button>'+
+    '<button class="abtn x'+(dr.kind==='x'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="x"><span class="ic">✕</span>無理</button></div>';
+  if(!dr.kind) return h+'</div>';
+  h+='<div class="detail">';
+  if(dr.kind==='o'){
+    const exp=dr.exp||'deadline';
+    h+='<div class="lbl">確定をいつまで待てますか</div><div class="chips">'+
+      chip(key,'exp','deadline','締切まで（'+fmt(rec.deadline)+'）',exp)+chip(key,'exp','now','すぐ確定でOK',exp)+chip(key,'exp','date','日付を指定',exp)+'</div>';
+    if(exp==='date'){
+      let opts='';const last=Math.max(today,rec.deadline);
+      const sel=dr.expDate!=null?dr.expDate:last;
+      for(let d=today;d<=last;d++) opts+='<option value="'+d+'"'+(d===sel?' selected':'')+'>'+fmt(d)+'まで</option>';
+      h+='<div style="margin-top:6px"><select data-key="'+key+'" data-f="expDate">'+opts+'</select></div>';
+    }
+    h+='<div class="hint">'+(S.rule==='earliest'?'締切か，⭕️の期限のうち早い日に確定します．':'締切の日に確定します．')+'期限までに決まらなければ，この⭕️は失効します．</div>';
+  }else if(dr.kind==='t'){
+    h+='<div class="lbl">理由 <span class="req">必須</span></div><div class="chips">'+T_PRESETS.map(p=>chip(key,'preset',p,p,dr.preset)).join('')+'</div>';
+    h+='<div class="lbl">補足（自由入力'+(dr.preset==='その他'?'・必須':'・任意')+'）</div><textarea data-key="'+key+'" data-f="reason" placeholder="例：バイト先のシフト確認待ち">'+esc(dr.reason||'')+'</textarea>';
+  }else{
+    h+='<div class="lbl">範囲 <span class="req">必須</span></div><div class="chips">'+chip(key,'range','all','全体',dr.range)+chip(key,'range','part','一部',dr.range)+'</div>';
+    if(dr.range==='part') h+='<div style="margin-top:6px"><input type="text" data-key="'+key+'" data-f="rangeNote" value="'+esc(dr.rangeNote||'')+'" placeholder="入れない時間帯（例：前半45分）"></div>';
+    h+='<div class="lbl">理由 <span class="req">必須</span></div><div class="chips">'+X_PRESETS.map(p=>chip(key,'preset',p,p,dr.preset)).join('')+'</div>';
+    h+='<div class="lbl">補足（自由入力'+(dr.preset==='その他'?'・必須':'・任意')+'）</div><textarea data-key="'+key+'" data-f="reason">'+esc(dr.reason||'')+'</textarea>';
+  }
+  if(dr.err) h+='<div class="err">'+esc(dr.err)+'</div>';
+  h+='<button class="primary" data-act="submit" data-key="'+key+'">この内容で回答する</button></div>';
+  return h+'</div>';
+}
+function chip(key,f,v,label,cur){return '<button class="chip'+(cur===v?' on':'')+'" data-act="pick" data-key="'+key+'" data-f="'+f+'" data-v="'+esc(v)+'">'+esc(label)+'</button>';}
+function head(r,scope){return '<div class="who"><h2>'+PEOPLE[r].role+'</h2><span class="name">'+esc(PEOPLE[r].name)+'</span></div><div class="scope">見える範囲：'+scope+'</div>';}
+
+/* ---------- 描画 ---------- */
+function render(){
+  const t=S.today, W=simulate(t);
+  $('todayLabel').innerHTML='<b>'+fmt(t)+'</b><small>今日（'+t+'日目）</small>';
+  $('slider').value=t;
+  document.querySelector('[data-act=prev]').disabled=t<=0;
+  document.querySelector('[data-act=next]').disabled=t>=MAXDAY;
+  // 目盛り（操作を足さずに進めた場合の出来事も表示）
+  const F=simulate(MAXDAY);
+  let tk='';
+  for(let d=0;d<=MAXDAY;d++){
+    const ks={};F.log.filter(l=>l.d===d).forEach(l=>ks[l.kind]=1);
+    const wd=wday(d);
+    tk+='<div class="tick'+(d===t?' cur':'')+(wd===0?' sun':wd===6?' sat':'')+'" data-act="go" data-d="'+d+'">'+dateOf(d).getDate()+'<div class="dots">'+
+      ['create','remind','confirm','expire','alert'].filter(k=>ks[k]).map(k=>'<span class="dot d-'+k+'"></span>').join('')+'</div></div>';
+  }
+  $('ticks').innerHTML=tk;
+  const todays=W.log.filter(l=>l.d===t);
+  const cnt=k=>todays.filter(l=>l.kind===k).length;
+  const parts=[['create','募集'],['answer','回答'],['remind','リマインド'],['confirm','確定'],['expire','失効'],['alert','アラート']].filter(p=>cnt(p[0])).map(p=>p[1]+cnt(p[0]));
+  $('events').innerHTML='この日の出来事：'+(parts.length?'<b>'+parts.join('・')+'</b>':'なし')+' ／ 印：<span style="color:var(--acc)">●</span>募集 <span style="color:var(--t)">●</span>リマインド <span style="color:var(--o)">●</span>確定 <span style="color:var(--gray)">●</span>失効 <span style="color:var(--x)">●</span>アラート';
+  // パネル
+  $('p-rec').innerHTML=recruiterPanel(W,t);
+  $('p-adm').innerHTML=adminPanel(W,t);
+  $('p-ua').innerHTML=userPanel(W,'ua',t);
+  $('p-ub').innerHTML=userPanel(W,'ub',t);
+  ['rec','adm','ua','ub'].forEach(r=>{
+    $('p-'+r).classList.toggle('on',S.tab===r);
+    const n=W.inbox[r].filter(x=>x.d===t).length;
+    document.querySelector('[data-bd='+r+']').innerHTML=n?'<span class="badge">'+n+'</span>':'';
+  });
+  document.querySelectorAll('nav#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
+  document.querySelectorAll('input[name=rule]').forEach(r=>r.checked=r.value===S.rule);
+  // ログ
+  $('loglist').innerHTML=W.log.length?W.log.slice().reverse().map(l=>'<li class="'+(l.d===t?'cur':'')+'"><span class="d">'+fmt(l.d)+'</span>'+esc(l.text)+(l.vis?'<span class="vis">［見える人：'+esc(l.vis)+'］</span>':'')+'</li>').join(''):'<li>まだ何もありません</li>';
+  const nav=$('tabs');nav.style.top=document.querySelector('header').offsetHeight+'px';
+}
+
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2600);}
+
+function addAction(a){
+  const before=S.actions.length;
+  S.actions=S.actions.filter(x=>x.day<=S.today);
+  if(S.actions.length<before) toast('これより後の日付の操作は取り消しました');
+  a.day=S.today; addRaw(a);
+}
+function setDay(d){d=Math.max(0,Math.min(MAXDAY,d));if(d===S.today)return;S.today=d;S.flash={};render();}
+
+/* ---------- 操作 ---------- */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  const act=b.dataset.act, key=b.dataset.key;
+  if(act==='prev') return setDay(S.today-1);
+  if(act==='next') return setDay(S.today+1);
+  if(act==='go') return setDay(+b.dataset.d);
+  if(act==='tab'){S.tab=b.dataset.tab;render();window.scrollTo({top:0});return;}
+  if(act==='reset'){scenario();S.today=0;S.form=null;render();toast('最初のシナリオに戻しました');return;}
+  if(act==='clear'){S.actions=[];S.seq=0;S.drafts={};S.flash={};S.form=null;S.today=0;render();toast('空のデータにしました');return;}
+  if(act==='fslot'){const f=S.form,s=b.dataset.slot,i=f.slots.indexOf(s);if(i>=0)f.slots.splice(i,1);else f.slots.push(s);render();return;}
+  if(act==='create'){
+    const f=S.form;
+    if(!f.slots.length){S.flash.form='コマを1つ以上選んでください．';render();return;}
+    const slots=SLOTS.filter(s=>f.slots.indexOf(s)>=0);
+    addAction({type:'create',by:'rec',rid:'R'+(S.seq+1)+'x'+Date.now()%1000,shiftDay:f.day,slots,note:f.note});
+    S.form={day:Math.min(S.today+7,MAXDAY),slots:[],note:''};S.flash={};
+    render();toast('募集を出しました');return;
+  }
+  if(act==='kind'){const d=S.drafts[key]||(S.drafts[key]={});d.kind=d.kind===b.dataset.v?null:b.dataset.v;d.err='';delete S.flash[key];render();return;}
+  if(act==='pick'){const d=S.drafts[key];d[b.dataset.f]=b.dataset.v;d.err='';render();return;}
+  if(act==='submit'){
+    const d=S.drafts[key],[u,rid,slot]=key.split('|');
+    let a={type:'answer',rid,slot,user:u,kind:d.kind};
+    if(d.kind==='o'){
+      const exp=d.exp||'deadline';
+      if(exp==='date'){
+        const W0=simulate(S.today),rec=W0.recs[rid];
+        a.expiry=d.expDate!=null?+d.expDate:Math.max(S.today,rec.deadline);
+      }else a.expiry=exp;
+    }else if(d.kind==='t'){
+      if(!d.preset){d.err='理由を選んでください．';render();return;}
+      if(d.preset==='その他'&&!(d.reason||'').trim()){d.err='「その他」の場合は補足を書いてください．';render();return;}
+      a.preset=d.preset;a.reason=(d.reason||'').trim();
+    }else{
+      if(!d.range){d.err='範囲（全体／一部）を選んでください．';render();return;}
+      if(d.range==='part'&&!(d.rangeNote||'').trim()){d.err='入れない時間帯を書いてください．';render();return;}
+      if(!d.preset){d.err='理由を選んでください．';render();return;}
+      if(d.preset==='その他'&&!(d.reason||'').trim()){d.err='「その他」の場合は補足を書いてください．';render();return;}
+      a.preset=d.preset;a.reason=(d.reason||'').trim();a.range=d.range;a.rangeNote=(d.rangeNote||'').trim();
+    }
+    const W0=simulate(S.today),sl=W0.recs[rid].slotState[slot];
+    addAction(a);
+    S.drafts[key]={};
+    S.flash[key]=(d.kind==='o'&&sl.confirmed)?{text:'このコマは，もう決まっています．回答ありがとうございました．'}:{text:'回答を送信しました．',ok:true};
+    render();return;
+  }
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='slider'){setDay(+t.value);return;}
+  if(t.dataset.form==='note'){S.form.note=t.value;return;}
+  if(t.dataset.key&&t.dataset.f&&t.tagName!=='SELECT'){(S.drafts[t.dataset.key]||(S.drafts[t.dataset.key]={}))[t.dataset.f]=t.value;}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.name==='rule'){S.rule=t.value;render();toast(t.value==='earliest'?'ルールA（最も早い時点で確定）':'ルールB（締切で確定・比較用）');return;}
+  if(t.dataset.form==='day'){S.form.day=+t.value;render();return;}
+  if(t.dataset.deadline){addAction({type:'deadline',rid:t.dataset.deadline,deadline:+t.value});render();toast('締切を'+fmt(+t.value)+'に設定しました');return;}
+  if(t.dataset.key&&t.dataset.f==='expDate'){S.drafts[t.dataset.key].expDate=+t.value;return;}
+});
+window.addEventListener('resize',()=>{$('tabs').style.top=document.querySelector('header').offsetHeight+'px';});
+
+scenario();
+render();
+})();
+</script>
+</body>
+</html>
