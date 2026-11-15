@@ -51,6 +51,17 @@ main{padding:10px;max-width:640px;margin:0 auto}
 .scope{font-size:12px;color:var(--sub);background:var(--graybg);border-radius:6px;padding:4px 8px;margin:0 0 10px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
 .fold>summary{list-style:none;cursor:pointer}.fold>summary::-webkit-details-marker{display:none}.fold>summary h3{font-size:14px;margin:0;color:var(--acc)}.fold[open]>summary h3{margin-bottom:8px}
+.answered{font-size:13px;padding:7px 9px;border-radius:8px;margin:4px 0 6px;border:1px solid var(--line);background:#fafbfc}
+.answered.ko{background:var(--obg);border-color:#bfe3cc}.answered.kt{background:var(--tbg);border-color:#f0dca8}.answered.kx{background:var(--xbg);border-color:#f2c4c4}
+.editbtn{width:100%;margin-top:2px}
+.cancel{width:100%;margin-top:6px}
+.editing{font-size:12px;font-weight:700;color:var(--acc);background:var(--accbg);border-radius:6px;padding:5px 8px;margin:4px 0 6px}
+.rec.done{background:#fbfdfb}
+.rec.past{opacity:.75}
+.fold .caret{margin-left:auto;color:var(--sub);font-size:12px;transition:transform .2s}
+.fold.new>summary h3{color:var(--acc)}
+.fold[open] .caret{transform:rotate(180deg)}
+.fold>summary h3{display:flex;align-items:center;gap:6px;color:var(--ink)}
 .card>h3{font-size:14px;margin:0 0 8px;display:flex;align-items:center;gap:6px}
 .empty{color:var(--sub);font-size:13px;margin:4px 0}
 .inbox{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto}
@@ -195,6 +206,8 @@ details.box li{margin:3px 0}
         <li>⭕️の期限：「締切まで」が初期値．「すぐ確定でOK」「〜日まで」も選べる．期限までに確定しなければ失効．</li>
         <li>確定（仮）：その時点の⭕️から，交代回数が少ない人を優先．同数なら固定乱数で抽選．確定時点の未回答者は，未回答のまま記録．</li>
         <li>確定後の⭕️：「もう決まっています」と表示する．</li>
+        <li>回答済みのコマは「✓ 回答済み」と回答内容を表示し，「回答を変更する」を押すまで変更できない．変更中は「変更をやめる」で戻せる．</li>
+        <li>勤務日を過ぎた募集は「過去の募集（アーカイブ）」に移す（消さずに残すので，集計にも使える）．</li>
         <li>リマインド：7日前・3日前・前日（日曜なら土曜に前倒し）．対象は未回答と△の人．</li>
         <li>管理者アラート：当日募集／前日になっても未決定／対象者全員が✕．</li>
         <li>処理の順番（モックの仮定）：毎日，朝に確定・失効の判定，日中に操作，夕方にリマインドと前日アラート．</li>
@@ -237,7 +250,7 @@ const T_PRESETS = ['誰もいなければ入ります','予定を確認中です
 const X_PRESETS = ['授業・試験と重なる','学外の予定（就活など）','体調がすぐれない','その他'];
 
 /* ---------- 状態 ---------- */
-const S = {today:0, rule:'earliest', actions:[], seq:0, tab:'ua', drafts:{}, flash:{}, forms:{}};
+const S = {today:0, rule:'earliest', actions:[], seq:0, tab:'ua', drafts:{}, flash:{}, forms:{}, edit:{}, opens:{}};
 
 /* ---------- 補助 ---------- */
 function dateOf(d){const x=new Date(BASE);x.setDate(x.getDate()+d);return x;}
@@ -479,7 +492,7 @@ function formCard(u,today){
   if(f.day<today) f.day=today;
   let opts='';
   for(let d=today;d<=MAXDAY;d++) opts+='<option value="'+d+'"'+(d===f.day?' selected':'')+'>'+fmt(d)+(d===today?'（今日）':'')+'</option>';
-  let h='<details class="card fold"'+(f.open?' open':'')+' data-fold="'+u+'"><summary><h3>＋ 新しく募集する</h3></summary>';
+  let h='<details class="card fold new"'+(f.open?' open':'')+' data-fold="'+u+'"><summary><h3>＋ 新しく募集する</h3></summary>';
   h+='<div class="field"><div class="lbl">日付 <span class="req">必須</span></div><select data-form="day" data-u="'+u+'">'+opts+'</select></div>';
   h+='<div class="field"><div class="lbl">コマ（複数可．コマごとに管理） <span class="req">必須</span></div><div class="chips">'+
     SLOTS.map(s=>'<button class="chip slotc'+(f.slots.indexOf(s)>=0?' on':'')+'" data-act="fslot" data-u="'+u+'" data-slot="'+s+'">'+s+'</button>').join('')+'</div></div>';
@@ -496,7 +509,9 @@ function adminPanel(W,today){
   const al=W.inbox.adm.filter(n=>n.kind==='alert');
   h+='<div class="card"><h3>🚨 アラート <span class="pill '+(al.length?'red':'gray')+'">'+al.length+'件</span></h3>'+
      (al.length?inboxHTML(al,today):'<p class="empty">アラートはありません</p>')+'</div>';
-  h+='<div class="card"><h3>📋 募集一覧（締切を設定）</h3>'+(W.order.length?W.order.slice().reverse().map(id=>fullRec(W,W.recs[id],today,true)).join(''):'<p class="empty">募集はありません</p>')+'</div>';
+  const act=W.order.slice().reverse().map(id=>W.recs[id]).filter(r=>!r.closed), arc=W.order.slice().reverse().map(id=>W.recs[id]).filter(r=>r.closed);
+  h+='<div class="card"><h3>📋 受付中の募集（締切を設定）</h3>'+(act.length?act.map(r=>fullRec(W,r,today,true)).join(''):'<p class="empty">受付中の募集はありません</p>')+'</div>';
+  h+=fold('past|adm','🗄 過去の募集（アーカイブ）',arc.length,arc.map(r=>fullRec(W,r,today,true)).join(''),'過去の募集はありません');
   h+='<div class="card"><h3>📊 交代回数と回答傾向</h3>';
   USERS.forEach(u=>{
     const c={o:HISTORY[u].o,t:HISTORY[u].t,x:HISTORY[u].x,n:HISTORY[u].n};
@@ -519,36 +534,64 @@ function userPanel(W,u,today){
   let h=head(u,'自分の回答と，自分が出した募集への全員の回答．他の人の募集では，他の人の回答や確定したかどうかは見えません．');
   h+='<div class="card"><h3>🔔 通知</h3>'+inboxHTML(W.inbox[u],today)+'</div>';
   const all=W.order.map(id=>W.recs[id]).reverse();
-  const others=all.filter(r=>r.by!==u), mine=all.filter(r=>r.by===u);
-  h+='<div class="card"><h3>📮 交代の募集（回答する）</h3>';
-  if(!others.length) h+='<p class="empty">他の人の募集はありません</p>';
-  others.forEach(rec=>{
-    h+='<div class="rec"><div class="rechead"><b>'+fmt(rec.shiftDay)+' '+rec.slots.join('・')+'</b>'+(rec.closed?'<span class="pill gray">終了</span>':'<span class="pill blue">受付中</span>')+'</div>';
-    h+='<div class="meta">募集者：'+nm(rec.by)+' ／ 締切：'+fmt(rec.deadline)+(today>=rec.deadline&&!rec.closed?'（締切後も回答できます）':'')+'</div>';
-    if(rec.note) h+='<div class="note">'+esc(rec.note)+'</div>';
-    rec.slots.forEach(slot=>{h+=userSlot(W,rec,slot,u,today);});
-    h+='</div>';
-  });
+  const others=all.filter(r=>r.by!==u&&!r.closed), mine=all.filter(r=>r.by===u&&!r.closed);
+  const todo=others.filter(r=>recNeeds(r,u)), done=others.filter(r=>!recNeeds(r,u));
+  const past=all.filter(r=>r.closed);
+  h+='<div class="card"><h3>📮 回答が必要な募集 <span class="pill '+(todo.length?'red':'gray')+'">'+todo.length+'件</span></h3>';
+  h+=todo.length?todo.map(r=>answerRec(W,r,u,today)).join(''):'<p class="empty">回答が必要な募集はありません</p>';
   h+='</div>';
+  h+=fold('done|'+u,'✅ 回答済みの募集',done.length,done.map(r=>answerRec(W,r,u,today)).join(''),'回答済みの募集はありません');
   h+=formCard(u,today);
-  h+='<div class="card"><h3>📋 自分の募集（全員の回答が見える）</h3>'+(mine.length?mine.map(r=>fullRec(W,r,today,false)).join(''):'<p class="empty">まだ募集していません</p>')+'</div>';
+  h+='<div class="card"><h3>📋 自分の募集（全員の回答が見える）</h3>'+(mine.length?mine.map(r=>fullRec(W,r,today,false)).join(''):'<p class="empty">受付中の募集はありません</p>')+'</div>';
+  h+=fold('past|'+u,'🗄 過去の募集（アーカイブ）',past.length,past.map(r=>r.by===u?fullRec(W,r,today,false):answerRec(W,r,u,today)).join(''),'過去の募集はありません');
   return h;
 }
 
+function slotNeeds(rec,slot,u){
+  if(rec.closed) return false;
+  const sl=rec.slotState[slot],a=sl.ans[u];
+  if(sl.confirmed&&sl.confirmed.user===u) return false;
+  return !a||(a.kind==='o'&&a.expired);
+}
+function recNeeds(rec,u){return rec.slots.some(s=>slotNeeds(rec,s,u));}
+function answerRec(W,rec,u,today){
+  const n=rec.slots.filter(s=>slotNeeds(rec,s,u)).length;
+  const pill=rec.closed?'<span class="pill gray">終了</span>':(n?'<span class="pill red">未回答 '+n+'コマ</span>':'<span class="pill green">✓ 回答済み</span>');
+  let h='<div class="rec'+(rec.closed?' past':n?'':' done')+'"><div class="rechead"><b>'+fmt(rec.shiftDay)+' '+rec.slots.join('・')+'</b>'+pill+'</div>';
+  h+='<div class="meta">募集者：'+nm(rec.by)+' ／ 締切：'+fmt(rec.deadline)+(today>=rec.deadline&&!rec.closed?'（締切後も回答できます）':'')+'</div>';
+  if(rec.note) h+='<div class="note">'+esc(rec.note)+'</div>';
+  rec.slots.forEach(slot=>{h+=userSlot(W,rec,slot,u,today);});
+  return h+'</div>';
+}
+function fold(id,title,n,body,empty){
+  return '<details class="card fold" data-keep="'+id+'"'+(S.opens[id]?' open':'')+'><summary><h3>'+title+' <span class="pill gray">'+n+'件</span> <span class="caret">▾</span></h3></summary>'+(n?body:'<p class="empty">'+empty+'</p>')+'</details>';
+}
 function userSlot(W,rec,slot,u,today){
   const sl=rec.slotState[slot],a=sl.ans[u],key=u+'|'+rec.id+'|'+slot;
   const dr=S.drafts[key]||{};
   if(sl.confirmed&&sl.confirmed.user===u)
     return '<div class="slot mine"><div class="slothead">'+slot+' <span class="pill green">あなたに確定</span></div><div class="hint">'+fmt(sl.confirmed.day)+'に確定しました．当日はよろしくお願いします．</div></div>';
-  let h='<div class="slot"><div class="slothead">'+slot+'</div>';
-  h+=a?'<div class="mine-ans">あなたの回答：'+ansLabel(a,rec)+'</div>':'<div class="mine-ans none">👀 まだ回答していません</div>';
+  const need=slotNeeds(rec,slot,u), editing=!!S.edit[key];
+  let h='<div class="slot"><div class="slothead">'+slot+' '+(need?'<span class="pill red">要回答</span>':'<span class="pill green">✓ 回答済み</span>')+'</div>';
   if(S.flash[key]) h+='<div class="flash'+(S.flash[key].ok?' ok':'')+'">'+esc(S.flash[key].text)+'</div>';
-  if(rec.closed) return h+'</div>';
+  if(a&&!need){
+    h+='<div class="answered k'+a.kind+'"><div>'+ansLabel(a,rec)+'</div><div class="when">'+fmt(a.day)+'に回答</div>';
+    if(a.kind==='t'&&!rec.closed) h+='<div class="hint">調整がついたら回答を変更してください（△の間はリマインドが届きます）．</div>';
+    h+='</div>';
+    if(rec.closed) return h+'</div>';
+    if(!editing) return h+'<button class="secondary editbtn" data-act="edit" data-key="'+key+'">✏️ 回答を変更する</button></div>';
+    h+='<div class="editing">回答を変更しています．送信するまで，今の回答は変わりません．</div>';
+  }else{
+    if(a) h+='<div class="mine-ans">前の回答：'+ansLabel(a,rec)+'</div>';
+    else h+='<div class="mine-ans none">👀 まだ回答していません</div>';
+    if(rec.closed) return h+'</div>';
+  }
   h+='<div class="btns">'+
     '<button class="abtn o'+(dr.kind==='o'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="o"><span class="ic">⭕️</span>代われます</button>'+
     '<button class="abtn t'+(dr.kind==='t'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="t"><span class="ic">△</span>調整中</button>'+
     '<button class="abtn x'+(dr.kind==='x'?' on':'')+'" data-act="kind" data-key="'+key+'" data-v="x"><span class="ic">✕</span>無理</button></div>';
-  if(!dr.kind) return h+'</div>';
+  const cancel=editing?'<button class="secondary cancel" data-act="cancel" data-key="'+key+'">変更をやめる</button>':'';
+  if(!dr.kind) return h+cancel+'</div>';
   h+='<div class="detail">';
   if(dr.kind==='o'){
     const exp=dr.exp||'deadline';
@@ -571,7 +614,7 @@ function userSlot(W,rec,slot,u,today){
     h+='<div class="lbl">補足（自由入力'+(dr.preset==='その他'?'・必須':'・任意')+'）</div><textarea data-key="'+key+'" data-f="reason">'+esc(dr.reason||'')+'</textarea>';
   }
   if(dr.err) h+='<div class="err">'+esc(dr.err)+'</div>';
-  h+='<button class="primary" data-act="submit" data-key="'+key+'">この内容で回答する</button></div>';
+  h+='<button class="primary" data-act="submit" data-key="'+key+'">'+(editing?'この内容に変更する':'この内容で回答する')+'</button>'+cancel+'</div>';
   return h+'</div>';
 }
 function chip(key,f,v,label,cur){return '<button class="chip'+(cur===v?' on':'')+'" data-act="pick" data-key="'+key+'" data-f="'+f+'" data-v="'+esc(v)+'">'+esc(label)+'</button>';}
@@ -621,7 +664,7 @@ function addAction(a){
   if(S.actions.length<before) toast('これより後の日付の操作は取り消しました');
   a.day=S.today; addRaw(a);
 }
-function setDay(d){d=Math.max(0,Math.min(MAXDAY,d));if(d===S.today)return;S.today=d;S.flash={};render();}
+function setDay(d){d=Math.max(0,Math.min(MAXDAY,d));if(d===S.today)return;S.today=d;S.flash={};S.edit={};render();}
 
 /* ---------- 操作 ---------- */
 document.addEventListener('click',e=>{
@@ -642,6 +685,8 @@ document.addEventListener('click',e=>{
     S.forms[u]={day:Math.min(S.today+7,MAXDAY),slots:[],note:'',open:true};S.flash={};
     render();toast('募集を出しました');return;
   }
+  if(act==='edit'){S.edit[key]=true;S.drafts[key]={};delete S.flash[key];render();return;}
+  if(act==='cancel'){delete S.edit[key];S.drafts[key]={};render();return;}
   if(act==='kind'){const d=S.drafts[key]||(S.drafts[key]={});d.kind=d.kind===b.dataset.v?null:b.dataset.v;d.err='';delete S.flash[key];render();return;}
   if(act==='pick'){const d=S.drafts[key];d[b.dataset.f]=b.dataset.v;d.err='';render();return;}
   if(act==='submit'){
@@ -666,8 +711,8 @@ document.addEventListener('click',e=>{
     }
     const W0=simulate(S.today),sl=W0.recs[rid].slotState[slot];
     addAction(a);
-    S.drafts[key]={};
-    S.flash[key]=(d.kind==='o'&&sl.confirmed)?{text:'このコマは，もう決まっています．回答ありがとうございました．'}:{text:'回答を送信しました．',ok:true};
+    S.drafts[key]={};const wasEdit=!!S.edit[key];delete S.edit[key];
+    S.flash[key]=(d.kind==='o'&&sl.confirmed)?{text:'このコマは，もう決まっています．回答ありがとうございました．'}:{text:wasEdit?'回答を変更しました．':'回答を送信しました．',ok:true};
     render();return;
   }
 });
@@ -684,7 +729,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.deadline){addAction({type:'deadline',rid:t.dataset.deadline,deadline:+t.value});render();toast('締切を'+fmt(+t.value)+'に設定しました');return;}
   if(t.dataset.key&&t.dataset.f==='expDate'){S.drafts[t.dataset.key].expDate=+t.value;return;}
 });
-document.addEventListener('toggle',e=>{const t=e.target;if(t.dataset&&t.dataset.fold&&S.forms[t.dataset.fold])S.forms[t.dataset.fold].open=t.open;},true);
+document.addEventListener('toggle',e=>{const t=e.target;if(t.dataset&&t.dataset.keep)S.opens[t.dataset.keep]=t.open;if(t.dataset&&t.dataset.fold&&S.forms[t.dataset.fold])S.forms[t.dataset.fold].open=t.open;},true);
 window.addEventListener('resize',()=>{$('tabs').style.top=document.querySelector('header').offsetHeight+'px';});
 
 scenario();
